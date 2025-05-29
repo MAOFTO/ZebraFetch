@@ -1,0 +1,174 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Project Overview
+
+*   **Type:** Microservice REST API
+*   **Description:** Dockerized FastAPI service that extracts and decodes 1D/2D barcodes (EAN, Code-128, QR, Data Matrix, PDF-417, etc.) from uploaded PDF documents (≤100 MB) for internal automation pipelines (N8N, Paperless-NGX).
+*   **Primary Goal:** Create a Dockerized, scalable barcode-scanning API with both sync (`/v1/scan`) and async (`/v1/jobs`) workflows, configurable via `config.yaml` or `ZF_CONFIG`, providing health, metrics, and interactive API documentation.
+
+## Project Structure
+
+### Framework-Specific Routing
+
+*   **Directory Rules:**
+
+    *   `FastAPI@0.100.x`: Organize routes under `app/api/v1` using `APIRouter` instances. Main entrypoint in `app/main.py`.
+    *   Example 1: `app/api/v1/scan.py` → defines `POST /v1/scan` router
+    *   Example 2: `app/api/v1/jobs.py` → defines async job endpoints (`POST`, `GET`, `DELETE`)
+
+### Core Directories
+
+*   **Versioned Structure:**
+
+    *   `app/`: FastAPI application code (0.100.x patterns)
+    *   `app/api`: All versioned routers (`v1` subfolder)
+    *   `app/core`: Configuration loading (`config.py`), logging setup
+    *   `app/services`: PDF rasterization & barcode engines integration
+    *   `app/workers`: Async job management using `asyncio.TaskGroup`
+    *   `app/db`: SQLite models & async helpers (via threadpool)
+    *   `tests/`: pytest suite with test cases for each endpoint
+    *   `infra/`: Dockerfile, docker-compose.yml, GitHub Actions workflows
+
+### Key Files
+
+*   **Stack-Versioned Patterns:**
+
+    *   `app/main.py` → FastAPI 0.100.x application instantiation, middleware, mount docs
+    *   `app/api/v1/scan.py` → Sync endpoint for immediate barcode scan
+    *   `app/api/v1/jobs.py` → Async job CRUD routes using background tasks
+    *   `config.yaml` → Default configuration file loaded via `pydantic.BaseSettings`
+    *   `Dockerfile` → `python:3.12-slim-bookworm` multi-stage build
+    *   `docker-compose.yml` → Service definition for local dev and Portainer stack
+    *   `.github/workflows/ci.yml` → GitHub Actions: lint, test, build, push (`zebrafetch/zebrafetch:1.0.0`)
+
+## Tech Stack Rules
+
+*   **Version Enforcement:**
+
+    *   `python@3.12-slim-bookworm`: Use as base Docker image; no older Python versions.
+    *   `fastapi@0.100.x`: All routes declared with `APIRouter`; no Flask or Django.
+    *   `uvicorn@0.22.x`: Serve with `--factory --reload` in development, `--workers 1 --loop asyncio` in production.
+    *   `pdfium-python@0.2.x`: Perform PDF rendering in threadpool to avoid blocking.
+    *   `zxing-cpp@latest-via-pybind11`: Wrap calls to C++ engine, manage GIL correctly.
+    *   `asyncio`: Use `TaskGroup` for parallel document processing; limit to `worker_pool_size`.
+    *   `sqlite3`: Always accessed via threadpool executor for async safety.
+    *   `black@23.x`, `flake8@6.x`, `mypy@1.x`: Enforce in CI; fail build on errors.
+    *   `docker@24.x`, `docker-compose@2.x`: Use Compose v2 syntax; reference images by tag.
+    *   `github-actions`: Use official actions for checkout, setup-python, cache, docker/build-push.
+
+## PRD Compliance
+
+*   **Non-Negotiable:**
+
+    *   "<= 10s typical, <= 20s P95 for 10-page PDFs; 60s hard sync timeout." → Sync endpoint must enforce 60s timeout and meet performance targets.
+    *   "Up to 2 parallel documents." → `worker_pool_size: 2` enforced in `config.yaml` and code.
+    *   "MIT/BSD/Apache dependencies only (no GPL)." → All dependencies must conform; no GPL-licensed packages.
+
+## App Flow Integration
+
+*   **Stack-Aligned Flow:**
+
+    *   FastAPI Scan Flow → `app/api/v1/scan.py` handles `POST /v1/scan`, calls `services.scan_pdf_sync`, returns JSON with decoded barcodes.
+    *   FastAPI Jobs Flow → `app/api/v1/jobs.py` uses `app.workers.JobManager` for `POST /v1/jobs`, `GET/DELETE /v1/jobs/{id}`.
+    *   Docs Integration → `app/main.py` mounts Swagger-UI at `/docs` and ReDoc at `/redoc`, serves static `openapi.yaml`.
+    *   Health & Metrics → `GET /healthz` in `app/api/health.py`, `GET /metrics` via `prometheus_client`.
+
+## Best Practices
+
+*   Python 3.12
+
+    *   Use type hints and `pydantic` models throughout.
+    *   Avoid global mutable state; configure via `BaseSettings`.
+    *   Use `asyncio.to_thread` for blocking I/O.
+
+*   FastAPI
+
+    *   Define routes with `APIRouter`, group by feature module.
+    *   Employ dependency injection for config and DB session.
+    *   Return Pydantic models for responses.
+
+*   Uvicorn
+
+    *   Use `--reload` in development only.
+    *   Set `timeout-keep-alive` and `--lifespan on`.
+
+*   pdfium-python
+
+    *   Render pages to images at required DPI.
+    *   Cache results for repeated scans (if enabled).
+
+*   zxing-cpp (PyBind11)
+
+    *   Release GIL around long-running scans.
+    *   Handle exceptions from C++ and map to Python errors.
+
+*   asyncio
+
+    *   Use `asyncio.TaskGroup` for worker pool.
+    *   Respect `cancel_scope` for job cancellation.
+
+*   SQLite
+
+    *   Use WAL mode for concurrency.
+    *   Access via threadpool to avoid blocking event loop.
+
+*   GitHub Actions
+
+    *   Cache `.venv` and Docker layers.
+    *   Run lint, type-check, tests in separate jobs.
+
+*   Black, Flake8, mypy
+
+    *   Enforce consistent style and zero errors; integrate as pre-commit hooks.
+
+*   Docker
+
+    *   Use multi-stage: builder for dependencies, final for runtime.
+    *   Pin base image to digest for reproducibility.
+
+*   Docker Compose
+
+    *   Define service healthchecks, restart policies.
+    *   Use `depends_on` only for startup ordering, not readiness.
+
+*   Portainer Deployment
+
+    *   Tag images with semantic version, use latest for dev.
+    *   Expose only required ports (8000 for API, 9090 for metrics).
+
+*   Cursor IDE
+
+    *   Use context-based code suggestions.
+    *   Annotate generated code with inline comments for clarity.
+
+## Rules
+
+*   Derive folder/file patterns **directly** from `techStackDoc` versions.
+*   If FastAPI 0.100.x: Enforce `app/` directory with nested routers in `app/api/v1/`.
+*   Never mix sync and async file structures; use consistent naming (`scan.py`, `jobs.py`).
+*   Always separate business logic (`services`) from route declarations.
+
+## Rules Metrics
+
+Before starting the project development, create a metrics file in the root of the project called
+
+`cursor_metrics.md`.
+
+### Instructions:
+
+*   Each time a cursor rule is used as context, update `cursor_metrics.md`.
+*   Use the following format for `cursor_metrics.md:`
+
+Rules Metrics
+
+Usage
+
+The number of times rules is used as context
+
+*   fastapi-routing.mdc: 0
+*   docker-compose-ports.mdc: 0
+*   ...other rules
+

@@ -1,0 +1,35 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+limits:
+  max_pdf_mb: 100
+  max_req_per_min: 0  # 0 means unlimited
+  sync_timeout_sec: 60
+  job_retention_hours: 24
+  worker_pool_size: 2
+
+auth:
+  enabled: false
+  api_keys: []  # Add API keys here if auth is enabled
+
+database:
+  sqlite_url: "sqlite:///./jobs.db"
+
+logging:
+  level: "INFO"
+  json: false
+
+metrics:
+  enabled: true
+
+cors:
+  allow_origins:
+    - "http://localhost"
+    - "http://localhost:8000"
+  allow_methods:
+    - "GET"
+    - "POST"
+  allow_headers:
+    - "Authorization"
+    - "Content-Type" 

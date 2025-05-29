@@ -1,0 +1,166 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Backend Structure Document
+
+## 1. Backend Architecture
+
+Overall, ZebraFetch’s backend is a self-contained REST API service built in Python. It follows an asynchronous, stateless design so you can spin up multiple containers side by side and handle more work as demand grows.
+
+*   **Core framework:** FastAPI for request handling and automatic OpenAPI docs.
+
+*   **Server engine:** Uvicorn (an asynchronous web server) to serve FastAPI apps efficiently.
+
+*   **Asynchronous processing:** Python’s `asyncio` task groups manage up to two concurrent PDF‐processing jobs per container.
+
+*   **Barcode decoding pipeline:**
+
+    *   PDF pages are rasterized by `pdfium-python`.
+    *   Barcodes are detected and decoded with the `zxing-cpp` library via PyBind11.
+
+*   **Stateless container design:** All state (jobs, results, file paths) goes into a SQLite database or temporary disk directories. Containers can be added or removed without losing track of work.
+
+How this supports our goals:
+
+*   **Scalability:** Each container can run in parallel. You can horizontally scale by adding more containers behind a load balancer.
+*   **Maintainability:** FastAPI’s standard patterns and Python type hints keep the code clear and testable. CI/CD enforces linting and typing checks.
+*   **Performance:** Async I/O, a lightweight Python image (`python:3.12-slim-bookworm`), and efficient native libraries ensure most 10-page PDFs finish under 10 seconds.
+
+## 2. Database Management
+
+ZebraFetch uses a lightweight SQL database (SQLite) to track asynchronous jobs and store artifact file paths.
+
+*   **Type:** SQL
+*   **System:** SQLite (file-based, no separate server required)
+*   **Why SQLite:** Perfect for low-write, internal workloads; zero-admin; easily packaged in Docker.
+
+Data practices:
+
+*   **Job tracking:** A single table holds job IDs, status, creation/update timestamps, result JSON, and paths to stored page or snippet images.
+*   **File storage:** Decoded pages or snippets (when requested) are written to the container’s disk under a known artifacts folder.
+*   **Access pattern:** Backend code opens the database on each request, runs simple queries, and closes it quickly—keeping things fast and reliable.
+
+## 3. Database Schema
+
+Below is a human-readable overview, followed by the actual SQL used when SQLite is initialized.
+
+Human-readable schema:
+
+*   **Jobs table**
+
+    *   `id`: Unique identifier for each job (text)
+    *   `status`: One of `pending`, `running`, `completed`, `failed`, or `canceled` (text)
+    *   `created_at`: Timestamp when the job was created
+    *   `updated_at`: Timestamp of the last status change
+    *   `expire_at`: Timestamp after which the job is auto-deleted (24 hours after creation)
+    *   `input_path`: File path of the uploaded PDF
+    *   `result_json`: JSON blob with decoded barcodes and metadata
+    *   `artifact_paths`: JSON array of file paths for embedded images (if requested)
+
+Actual SQL (SQLite dialect):
+
+`CREATE TABLE IF NOT EXISTS jobs ( id TEXT PRIMARY KEY, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, expire_at TEXT NOT NULL, input_path TEXT NOT NULL, result_json TEXT, artifact_paths TEXT );`
+
+An index on `expire_at` helps with periodic cleanup tasks.
+
+## 4. API Design and Endpoints
+
+ZebraFetch offers a simple, RESTful interface. All responses are JSON, and errors use standard HTTP status codes.
+
+*   **Authentication:** Placeholder for API-Key or Bearer tokens (disabled by default).
+*   **Rate limiting:** Configurable via `config.yaml` (`max_req_per_min`).
+
+### Key Endpoints
+
+1.  POST `/v1/scan`
+
+    *   **Purpose:** Synchronously process a single PDF and return decoded barcodes.
+    *   **Input:** `multipart/form-data` or raw body (PDF file), optional queries: `pages`, `types`, `embed_page`, `embed_snippet`.
+    *   **Behavior:** Timeout after 60 seconds (configurable). Returns JSON with page indexes, barcode values, and any undecodable barcodes.
+
+2.  POST `/v1/jobs`
+
+    *   **Purpose:** Create an asynchronous job.
+    *   **Input:** Same as `/v1/scan`.
+    *   **Behavior:** Returns a job ID immediately. Processing happens in the background.
+
+3.  GET `/v1/jobs/{id}`
+
+    *   **Purpose:** Check status or retrieve results of an async job.
+    *   **Output:** Job status and, if complete, the same JSON structure as `/v1/scan`.
+
+4.  DELETE `/v1/jobs/{id}`
+
+    *   **Purpose:** Cancel a queued or running job.
+
+5.  GET `/healthz`
+
+    *   **Purpose:** Health check endpoint—returns HTTP 200 if the service is up.
+
+6.  GET `/metrics`
+
+    *   **Purpose:** Exposes Prometheus metrics (request counts, latencies, job queue depth).
+
+### Documentation
+
+*   **Swagger UI** and **ReDoc** served at standard FastAPI routes.
+*   Raw `openapi.yaml` provided under `/openapi.json` for scripted consumption.
+
+## 5. Hosting Solutions
+
+ZebraFetch runs entirely in Docker containers, managed by [Portainer](https://www.portainer.io/) on an internal network.
+
+*   **Container image:** `zebrafetch/zebrafetch:1.0.0` on Docker Hub.
+*   **Orchestration:** Portainer handles create, update, and scale operations.
+*   **TLS termination:** Performed upstream (e.g., on an Nginx reverse proxy), so inside the Docker network all traffic is HTTP.
+
+Benefits:
+
+*   **Reliability:** Containers are immutable, so recoveries and rollbacks are straightforward.
+*   **Scalability:** Spin up more containers to meet higher demand.
+*   **Cost-effectiveness:** No separate VM per container—just a shared Docker host or small cluster.
+
+## 6. Infrastructure Components
+
+*   **Load Balancer / Reverse Proxy:** An external Nginx or HAProxy handles TLS and evenly distributes incoming API calls across containers.
+*   **Docker Host:** A server (or cluster) running Docker Engine and Portainer.
+*   **Artifact Storage:** Local container disk; ephemeral and cleaned after the job expires.
+*   **Database File:** SQLite file stored in a Docker volume so it persists across container restarts.
+*   **CI/CD Pipeline (GitHub Actions):** Automates linting (Black, Flake8), type checks (mypy), tests, Docker build, and Docker Hub push.
+*   **DNS & Service Discovery:** Internal DNS points the service name to the load-balanced endpoint.
+
+All these pieces work together to ensure fast, reliable barcode extraction.
+
+## 7. Security Measures
+
+*   **API Authentication:** Optional API-Key/Bearer token middleware (disabled by default for MVP).
+*   **Rate Limiting:** Configurable per minute in `config.yaml` (`max_req_per_min`).
+*   **TLS Encryption:** Enforced at the reverse proxy—internal traffic remains plain HTTP.
+*   **Least Privilege:** Containers run with minimal OS permissions; no SSH inside containers.
+*   **Configuration Management:** Sensitive values (e.g., Docker Hub credentials) stored in GitHub Secrets and environment variables.
+*   **Logging to stdout:** Allows integration with centralized log systems later, even though MVP logs remain local.
+
+## 8. Monitoring and Maintenance
+
+*   **Health Checks:** `/healthz` endpoint polled by orchestrator or load balancer.
+*   **Metrics:** Prometheus-compatible `/metrics` endpoint for real-time monitoring.
+*   **Alerts & Dashboards:** Can be set up in Grafana using the Prometheus metrics.
+*   **Job Cleanup:** A background task (or external cron) removes expired jobs and artifacts after 24 hours.
+*   **CI/CD Enforcement:** Every change goes through automatic checks—lint, type, unit and integration tests, and performance benchmarks.
+*   **Versioning:** Docker images tagged by Git commit and semantic version (e.g., `1.0.0`).
+
+## 9. Conclusion and Overall Backend Summary
+
+ZebraFetch’s backend is a clean, Docker-native REST API built with FastAPI and Uvicorn. It uses SQLite for simple job management, offloads TLS to a reverse proxy, and supports both synchronous and asynchronous barcode extraction workflows. All core components—libraries for PDF rasterization and barcode decoding—are open-source and properly licensed.
+
+This setup delivers on key goals:
+
+*   **High performance:** Most 10-page PDFs complete in under 10 seconds.
+*   **Ease of deployment:** One Docker image and a single config file (`config.yaml` or `ZF_CONFIG`).
+*   **Scalability:** Stateless containers behind a load balancer.
+*   **Observability:** Health, metrics, and logging ready for integration into existing monitoring systems.
+
+With this structure, any IT team can deploy, operate, and scale ZebraFetch in their automation pipelines without fuss.
+

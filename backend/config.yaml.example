@@ -1,0 +1,87 @@
+# ZebraFetch Configuration Example
+
+# Server settings
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  timeout: 60  # seconds
+
+# API settings
+api:
+  prefix: "/v1"
+  docs_url: "/docs"
+  redoc_url: "/redoc"
+  openapi_url: "/openapi.json"
+
+# CORS settings
+cors:
+  origins:
+    - "http://localhost:3000"
+    - "http://localhost:8000"
+  methods:
+    - "GET"
+    - "POST"
+  headers:
+    - "Content-Type"
+    - "Authorization"
+    - "X-API-Key"
+
+# Authentication settings
+auth:
+  enabled: false
+  api_keys:
+    - "your-secure-api-key-here"
+
+# Rate limiting
+rate_limit:
+  enabled: true
+  requests_per_minute: 60
+  burst: 10
+
+# File upload settings
+upload:
+  max_size: 10485760  # 10MB in bytes
+  allowed_types:
+    - "application/pdf"
+
+# Scanner settings
+scanner:
+  dpi: 300
+  default_symbologies:
+    - "QRCode"
+    - "DataMatrix"
+    - "Code128"
+    - "Code39"
+    - "EAN13"
+    - "EAN8"
+    - "UPCA"
+    - "UPCE"
+  embed_images: true
+  embed_snippets: true
+
+# Job settings
+jobs:
+  max_concurrent: 4
+  timeout: 300  # seconds
+  retention: 86400  # seconds (24 hours)
+
+# Database settings
+database:
+  url: "sqlite:///data/zebrafetch.db"
+  pool_size: 5
+  max_overflow: 10
+
+# Logging settings
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/zebrafetch.log"
+  max_size: 10485760  # 10MB
+  backup_count: 5
+
+# Metrics settings
+metrics:
+  enabled: true
+  path: "/metrics"
+  namespace: "zebrafetch" 

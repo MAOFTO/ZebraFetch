@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  zebrafetch:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zebrafetch
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - zebrafetch_data:/app/data
+    environment:
+      - ZF_CONFIG=/app/config.yaml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  zebrafetch_data: 

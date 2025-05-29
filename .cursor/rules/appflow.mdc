@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# App Flow Document for ZebraFetch
+
+## Onboarding and Sign-In/Sign-Up
+
+A new IT staff member begins by checking out the ZebraFetch repository from GitHub and configuring the project for deployment. They use Docker Compose and Portainer to launch the container stack, ensuring the `config.yaml` file is in place or specifying an alternate path via the `ZF_CONFIG` environment variable. By default, the service does not require authentication, but the user can enable an API-Key or Bearer-token placeholder module by setting the appropriate flags in the configuration file before starting the container. No sign-up or password recovery flows are necessary since the service is intended for internal automation via N8N and Paperless-NGX.
+
+## Main Dashboard or Home Page
+
+Once the ZebraFetch container is running, IT staff or developers point their browser to the base URL on the exposed port. The container does not present a traditional homepage, but navigating to `/docs` brings up the interactive Swagger-UI with all endpoints, request parameters, and response schemas documented. Alternatively, `/redoc` serves the same OpenAPI specification through ReDoc, and `/openapi.yaml` provides the raw specification file for client generation or external portals. These paths act as the central interface for exploring and validating the API before integration.
+
+## Detailed Feature Flows and Page Transitions
+
+When an automation workflow such as N8N needs to extract barcodes immediately, it sends a `POST` request to `/v1/scan` with the PDF file attached using `multipart/form-data` or as a raw body. The request can include query parameters for page ranges, specific barcode types, and flags to embed full-page or snippet images in base-64. The service rasterizes pages with PDFium, decodes each barcode using ZXing-cpp, and responds directly with a structured JSON payload listing every decoded and undecodable symbol. For longer or bulk operations, N8N submits a `POST` to `/v1/jobs` using the same payload. The API immediately returns a `job_id` and queues the processing in an asyncio task group limited to two concurrent jobs. To track progress, N8N polls `GET /v1/jobs/{job_id}`; while processing, the endpoint returns `{
+
