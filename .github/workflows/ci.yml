@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+    
+    - name: Run Black
+      run: black --check backend/app
+    
+    - name: Run Flake8
+      run: flake8 backend/app
+    
+    - name: Run mypy
+      run: mypy backend/app
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run tests
+      run: pytest --maxfail=1 --disable-warnings -q
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
+    - name: Build and push
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: true
+        tags: |
+          zebrafetch/zebrafetch:latest
+          zebrafetch/zebrafetch:${{ github.ref == 'refs/heads/main' && 'dev' || github.ref_name }}
+
+  perf-test:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run performance test
+      run: |
+        # Create a 10-page test PDF
+        python -c "
+        from PIL import Image, ImageDraw
+        import io
+        img = Image.new('RGB', (200, 200), color='white')
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([50, 50, 150, 150], fill='black')
+        pdf_bytes = io.BytesIO()
+        img.save(pdf_bytes, format='PDF')
+        with open('test.pdf', 'wb') as f:
+            f.write(pdf_bytes.getvalue())
+        "
+        
+        # Measure scan time
+        start_time = time.time()
+        python -c "
+        from app.services.scanner import Scanner
+        scanner = Scanner()
+        with open('test.pdf', 'rb') as f:
+            scanner.scan_pdf(f.read())
+        "
+        end_time = time.time()
+        
+        # Fail if P95 > 20s
+        if end_time - start_time > 20:
+            exit(1) 
