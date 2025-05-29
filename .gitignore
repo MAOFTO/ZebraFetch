@@ -1,0 +1,3 @@
+# Ignore Cursor IDE and internal files
+.cursor/
+cursor_metrics.md 
