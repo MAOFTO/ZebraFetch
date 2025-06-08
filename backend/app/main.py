@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Dict, Union
+from typing import Dict, Union, Awaitable
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -14,8 +14,8 @@ from fastapi.exceptions import RequestValidationError
 from .config import get_settings
 from .db import init_db, cleanup_expired_jobs
 from .exceptions import (
-    validation_exception_handler,
-    http_exception_handler,
+    validation_exception_handler as old_validation_handler,
+    http_exception_handler as old_http_handler,
     payload_too_large_handler,
     rate_limit_exceeded_handler,
     ZebraFetchException,
@@ -49,10 +49,10 @@ app.add_middleware(
 )
 
 # Add exception handlers
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-app.add_exception_handler(413, payload_too_large_handler)
-app.add_exception_handler(429, rate_limit_exceeded_handler)
+app.add_exception_handler(RequestValidationError, old_validation_handler)  # type: ignore
+app.add_exception_handler(StarletteHTTPException, old_http_handler)  # type: ignore
+app.add_exception_handler(413, payload_too_large_handler)  # type: ignore
+app.add_exception_handler(429, rate_limit_exceeded_handler)  # type: ignore
 
 # Metrics
 REQUEST_COUNT = Counter(
@@ -103,39 +103,15 @@ async def periodic_cleanup() -> None:
         await asyncio.sleep(settings.cleanup_interval)
 
 
-@app.exception_handler(RequestValidationError)  # type: ignore
-async def validation_exception_handler(
+@app.exception_handler(ZebraFetchException)  # type: ignore
+async def zebrafetch_exception_handler(
     request: Request, exc: Exception
-) -> JSONResponse:
-    if isinstance(exc, RequestValidationError):
-        return JSONResponse(
-            status_code=422,
-            content={
-                "detail": "Validation error",
-                "errors": exc.errors(),
-            },
-        )
-    raise exc
-
-
-@app.exception_handler(StarletteHTTPException)  # type: ignore
-async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    if isinstance(exc, StarletteHTTPException):
+) -> Union[Response, Awaitable[Response]]:
+    """Handle ZebraFetch exceptions."""
+    if isinstance(exc, ZebraFetchException):
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
             headers=exc.headers,
         )
     raise exc
-
-
-@app.exception_handler(ZebraFetchException)  # type: ignore
-async def zebrafetch_exception_handler(
-    request: Request, exc: ZebraFetchException
-) -> Union[Response, JSONResponse]:
-    """Handle ZebraFetch exceptions."""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-        headers=exc.headers,
-    )
