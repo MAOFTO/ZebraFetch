@@ -1,11 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
-from typing import List, Optional
 import asyncio
 import tempfile
 import os
 import uuid
-from datetime import datetime
 
 from ..config import get_settings
 from ..services.scanner import Scanner
