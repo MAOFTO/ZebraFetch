@@ -1,6 +1,6 @@
 import io
 import base64
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 import pypdfium2 as pdfium
 import zxingcpp
 import logging
