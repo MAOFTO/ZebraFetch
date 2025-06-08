@@ -1,36 +1,44 @@
-"""Main FastAPI application module for ZebraFetch."""
+"""Main application module."""
 
-from fastapi import FastAPI, status, HTTPException, Request
+import asyncio
+import logging
+from typing import Dict, Union
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import Response
+from pydantic import ValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, make_asgi_app
 from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
-import asyncio
-from typing import Dict
 
-from app.config import get_settings
-from app.db import init_db, cleanup_expired_jobs
-from app.routes import scan, jobs
-from app.exceptions import (
+from .config import get_settings
+from .db import init_db, cleanup_expired_jobs
+from .exceptions import (
     validation_exception_handler,
     http_exception_handler,
     payload_too_large_handler,
     rate_limit_exceeded_handler,
     ZebraFetchException,
 )
+from .routes import jobs, scan
 
-# Create FastAPI app with custom docs URLs
+settings = get_settings()
+
+# Configure logging
+logging.basicConfig(
+    level=settings.log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="ZebraFetch API",
+    description="PDF processing and barcode scanning service",
     version="1.0.0",
-    description=("Dockerized REST API for barcode extraction " "from PDF documents."),
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url="/docs" if settings.enable_docs else None,
+    redoc_url="/redoc" if settings.enable_docs else None,
 )
-
-# Load settings
-settings = get_settings()
 
 # Add CORS middleware
 app.add_middleware(
@@ -44,12 +52,8 @@ app.add_middleware(
 # Add exception handlers
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-app.add_exception_handler(
-    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, payload_too_large_handler
-)
-app.add_exception_handler(
-    status.HTTP_429_TOO_MANY_REQUESTS, rate_limit_exceeded_handler
-)
+app.add_exception_handler(413, payload_too_large_handler)
+app.add_exception_handler(429, rate_limit_exceeded_handler)
 
 # Metrics
 REQUEST_COUNT = Counter(
@@ -68,13 +72,13 @@ app.include_router(jobs.router)
 
 @app.get("/health")  # type: ignore
 async def health_check() -> Dict[str, str]:
-    """Check the health status of the application."""
+    """Check API health."""
     return {"status": "healthy"}
 
 
 @app.get("/")  # type: ignore
 async def root() -> Dict[str, str]:
-    """Return basic API information."""
+    """Get API information."""
     return {
         "name": "ZebraFetch API",
         "version": "1.0.0",
@@ -85,28 +89,54 @@ async def root() -> Dict[str, str]:
 @app.on_event("startup")  # type: ignore
 async def startup_event() -> None:
     """Initialize application on startup."""
-    # Initialize database
     await init_db()
-
-    # Initialize task group for async jobs
     jobs.init_task_group()
-
-    # Start background task for cleaning up expired jobs
     asyncio.create_task(periodic_cleanup())
 
 
 async def periodic_cleanup() -> None:
     """Periodically clean up expired jobs."""
     while True:
-        await cleanup_expired_jobs()
-        await asyncio.sleep(3600)  # Run every hour
+        try:
+            await cleanup_expired_jobs()
+        except Exception as e:
+            logger.error(f"Error in periodic cleanup: {e}")
+        await asyncio.sleep(settings.cleanup_interval)
+
+
+@app.exception_handler(ValidationError)  # type: ignore
+async def validation_exception_handler(
+    request: Request, exc: ValidationError
+) -> Union[Response, JSONResponse]:
+    """Handle Pydantic validation errors."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Validation error",
+            "errors": exc.errors(),
+        },
+    )
+
+
+@app.exception_handler(StarletteHTTPException)  # type: ignore
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> Union[Response, JSONResponse]:
+    """Handle HTTP exceptions."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
 
 
 @app.exception_handler(ZebraFetchException)  # type: ignore
 async def zebrafetch_exception_handler(
     request: Request, exc: ZebraFetchException
-) -> HTTPException:
-    """Handle ZebraFetch exceptions and return appropriate HTTP responses."""
-    return HTTPException(
-        status_code=exc.status_code, detail=exc.detail, headers=exc.headers
+) -> Union[Response, JSONResponse]:
+    """Handle ZebraFetch exceptions."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
     )
