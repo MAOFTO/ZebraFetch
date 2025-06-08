@@ -1,4 +1,5 @@
-"""Configuration settings and environment variables for the ZebraFetch application."""
+"""Configuration settings and environment variables for the ZebraFetch \
+application."""
 
 from pydantic_settings import BaseSettings
 from pydantic import Field

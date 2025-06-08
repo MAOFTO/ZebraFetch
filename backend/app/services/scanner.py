@@ -3,7 +3,6 @@ import base64
 from typing import List, Dict, Any, Optional
 import pypdfium2 as pdfium
 import zxingcpp
-from PIL import Image
 import logging
 
 # Configure logging
