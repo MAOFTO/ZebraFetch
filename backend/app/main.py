@@ -89,7 +89,6 @@ async def root() -> Dict[str, str]:
 async def startup_event() -> None:
     """Initialize application on startup."""
     await init_db()
-    jobs.init_task_group()
     asyncio.create_task(periodic_cleanup())
 
 

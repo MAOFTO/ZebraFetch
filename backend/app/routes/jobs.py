@@ -18,10 +18,10 @@ router = APIRouter(prefix="/v1")
 # Global task group manager
 class TaskGroupManager:
     def __init__(self) -> None:
-        self._task_group: Optional[asyncio.TaskGroup] = None
+        self._task_group: Optional[Any] = None
         self._lock = asyncio.Lock()
 
-    async def get_task_group(self) -> asyncio.TaskGroup:
+    async def get_task_group(self) -> Any:
         async with self._lock:
             if self._task_group is None:
                 if sys.version_info >= (3, 11):
