@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     log_json: bool = False
     metrics_enabled: bool = True
     cors: CORSSettings = Field(default_factory=CORSSettings)
+    enable_docs: bool = True
+    cleanup_interval: int = 3600
 
     class Config:
         """Pydantic model configuration settings."""

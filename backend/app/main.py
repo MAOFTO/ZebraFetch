@@ -7,7 +7,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
-from pydantic import ValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, make_asgi_app
 from fastapi.exceptions import RequestValidationError
@@ -104,30 +103,30 @@ async def periodic_cleanup() -> None:
         await asyncio.sleep(settings.cleanup_interval)
 
 
-@app.exception_handler(ValidationError)  # type: ignore
+@app.exception_handler(RequestValidationError)  # type: ignore
 async def validation_exception_handler(
-    request: Request, exc: ValidationError
-) -> Union[Response, JSONResponse]:
-    """Handle Pydantic validation errors."""
-    return JSONResponse(
-        status_code=422,
-        content={
-            "detail": "Validation error",
-            "errors": exc.errors(),
-        },
-    )
+    request: Request, exc: Exception
+) -> JSONResponse:
+    if isinstance(exc, RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "Validation error",
+                "errors": exc.errors(),
+            },
+        )
+    raise exc
 
 
 @app.exception_handler(StarletteHTTPException)  # type: ignore
-async def http_exception_handler(
-    request: Request, exc: StarletteHTTPException
-) -> Union[Response, JSONResponse]:
-    """Handle HTTP exceptions."""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-        headers=exc.headers,
-    )
+async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, StarletteHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=exc.headers,
+        )
+    raise exc
 
 
 @app.exception_handler(ZebraFetchException)  # type: ignore
