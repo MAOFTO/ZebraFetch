@@ -34,7 +34,10 @@ async def init_db() -> None:
 def _init_db_sync() -> None:
     """Initialize the database schema synchronously."""
     with get_db_connection() as conn:
-        with open("schemas/jobs.sql", "r") as f:
+        schema_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "schemas", "jobs.sql"
+        )
+        with open(schema_path, "r") as f:
             conn.executescript(f.read())
         conn.commit()
 
