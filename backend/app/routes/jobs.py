@@ -24,7 +24,6 @@ task_group: Any = None
 def init_task_group() -> None:
     """Initialize the task group and semaphore."""
     global task_group
-    settings = get_settings()
     if sys.version_info >= (3, 11):
         task_group = asyncio.TaskGroup()
     else:
