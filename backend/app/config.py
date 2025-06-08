@@ -2,10 +2,12 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 from typing import List
 
+
 class CORSSettings(BaseSettings):
     allow_origins: List[str] = Field(default_factory=list)
     allow_methods: List[str] = Field(default_factory=list)
     allow_headers: List[str] = Field(default_factory=list)
+
 
 class Settings(BaseSettings):
     host: str = "0.0.0.0"
@@ -29,6 +31,7 @@ class Settings(BaseSettings):
     @property
     def max_pdf_bytes(self) -> int:
         return self.max_pdf_mb * 1024 * 1024
+
 
 def get_settings() -> Settings:
     return Settings()

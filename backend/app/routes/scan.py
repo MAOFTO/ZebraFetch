@@ -11,6 +11,7 @@ from ..dependencies.auth import get_api_key
 
 router = APIRouter(prefix="/v1")
 
+
 @router.post("/scan")
 async def scan_pdf(
     file: UploadFile = File(...),
@@ -18,28 +19,27 @@ async def scan_pdf(
     types: Optional[str] = None,
     embed_page: bool = False,
     embed_snippet: bool = False,
-    api_key: str = Depends(get_api_key)
+    api_key: str = Depends(get_api_key),
 ) -> JSONResponse:
     """Scan PDF for barcodes synchronously."""
     settings = get_settings()
-    
+
     # Validate file type
     if not file.content_type == "application/pdf":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be a PDF"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="File must be a PDF"
         )
-    
+
     # Read file content
     content = await file.read()
-    
+
     # Check file size
     if len(content) > settings.max_pdf_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"PDF must be smaller than {settings.max_pdf_mb}MB"
+            detail=f"PDF must be smaller than {settings.max_pdf_mb}MB",
         )
-    
+
     # Parse page range
     page_range = None
     if pages:
@@ -52,17 +52,17 @@ async def scan_pdf(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid page range format"
+                detail="Invalid page range format",
             )
-    
+
     # Parse barcode types
     symbologies = types.split(",") if types else None
-    
+
     # Create temporary file
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         temp_file.write(content)
         temp_path = temp_file.name
-    
+
     try:
         # Process PDF with timeout
         scanner = Scanner()
@@ -75,23 +75,23 @@ async def scan_pdf(
                     page_range=page_range,
                     symbologies=symbologies,
                     embed_page=embed_page,
-                    embed_snippet=embed_snippet
-                )
+                    embed_snippet=embed_snippet,
+                ),
             ),
-            timeout=settings.sync_timeout_sec
+            timeout=settings.sync_timeout_sec,
         )
-        
+
         return JSONResponse(content={"results": results})
-    
+
     except asyncio.TimeoutError:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="PDF processing timed out"
+            detail="PDF processing timed out",
         )
-    
+
     finally:
         # Clean up temporary file
         try:
             os.unlink(temp_path)
         except OSError:
-            pass 
+            pass
