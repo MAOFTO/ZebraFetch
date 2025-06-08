@@ -44,10 +44,7 @@ class ZebraFetchException(StarletteHTTPException):
     """Base exception class for ZebraFetch application errors."""
 
     def __init__(
-        self,
-        status_code: int,
-        detail: str,
-        headers: Optional[dict] = None
+        self, status_code: int, detail: str, headers: Optional[dict] = None
     ) -> None:
         """Initialize the exception with status code and detail message."""
         super().__init__(status_code=status_code, detail=detail, headers=headers)
@@ -58,10 +55,7 @@ class PDFProcessingError(ZebraFetchException):
 
     def __init__(self, detail: str) -> None:
         """Initialize with a 400 Bad Request status code."""
-        super().__init__(
-            status_code=400,
-            detail=f"PDF processing error: {detail}"
-        )
+        super().__init__(status_code=400, detail=f"PDF processing error: {detail}")
 
 
 class JobNotFoundError(ZebraFetchException):
@@ -69,10 +63,7 @@ class JobNotFoundError(ZebraFetchException):
 
     def __init__(self, job_id: str) -> None:
         """Initialize with a 404 Not Found status code."""
-        super().__init__(
-            status_code=404,
-            detail=f"Job not found: {job_id}"
-        )
+        super().__init__(status_code=404, detail=f"Job not found: {job_id}")
 
 
 class InvalidJobStateError(ZebraFetchException):
@@ -83,9 +74,8 @@ class InvalidJobStateError(ZebraFetchException):
         super().__init__(
             status_code=400,
             detail=(
-                f"Invalid operation for job {job_id} "
-                f"in state: {current_state}"
-            )
+                f"Invalid operation for job {job_id} " f"in state: {current_state}"
+            ),
         )
 
 
@@ -94,10 +84,7 @@ class AuthenticationError(ZebraFetchException):
 
     def __init__(self, detail: str = "Authentication failed") -> None:
         """Initialize with a 401 Unauthorized status code."""
-        super().__init__(
-            status_code=401,
-            detail=detail
-        )
+        super().__init__(status_code=401, detail=detail)
 
 
 class RateLimitError(ZebraFetchException):
@@ -105,7 +92,4 @@ class RateLimitError(ZebraFetchException):
 
     def __init__(self, detail: str = "Rate limit exceeded") -> None:
         """Initialize with a 429 Too Many Requests status code."""
-        super().__init__(
-            status_code=429,
-            detail=detail
-        )
+        super().__init__(status_code=429, detail=detail)

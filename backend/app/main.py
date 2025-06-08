@@ -2,7 +2,12 @@
 
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST, make_asgi_app
+from prometheus_client import (
+    Counter,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+    make_asgi_app,
+)
 from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -16,7 +21,7 @@ from .exceptions import (
     http_exception_handler,
     payload_too_large_handler,
     rate_limit_exceeded_handler,
-    ZebraFetchException
+    ZebraFetchException,
 )
 
 # Create FastAPI app with custom docs URLs
@@ -78,7 +83,7 @@ async def root():
     return {
         "name": "ZebraFetch API",
         "version": "1.0.0",
-        "description": "PDF processing and barcode scanning service"
+        "description": "PDF processing and barcode scanning service",
     }
 
 
@@ -106,7 +111,5 @@ async def periodic_cleanup():
 async def zebrafetch_exception_handler(request, exc):
     """Handle ZebraFetch exceptions and return appropriate HTTP responses."""
     return HTTPException(
-        status_code=exc.status_code,
-        detail=exc.detail,
-        headers=exc.headers
+        status_code=exc.status_code, detail=exc.detail, headers=exc.headers
     )

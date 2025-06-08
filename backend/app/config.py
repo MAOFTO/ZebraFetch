@@ -7,7 +7,7 @@ from typing import List
 
 class CORSSettings(BaseSettings):
     """CORS (Cross-Origin Resource Sharing) configuration settings."""
-    
+
     allow_origins: List[str] = Field(default_factory=list)
     allow_methods: List[str] = Field(default_factory=list)
     allow_headers: List[str] = Field(default_factory=list)
@@ -15,7 +15,7 @@ class CORSSettings(BaseSettings):
 
 class Settings(BaseSettings):
     """Main application configuration settings."""
-    
+
     host: str = "0.0.0.0"
     port: int = 8000
     max_pdf_mb: int = 100
@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     class Config:
         """Pydantic model configuration settings."""
+
         env_prefix = "ZF_"
 
     @property
