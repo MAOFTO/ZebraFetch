@@ -1,6 +1,8 @@
-from fastapi import FastAPI, Request, status
+"""Main FastAPI application module for ZebraFetch."""
+
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST, make_asgi_app
 from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -14,6 +16,7 @@ from .exceptions import (
     http_exception_handler,
     payload_too_large_handler,
     rate_limit_exceeded_handler,
+    ZebraFetchException
 )
 
 # Create FastAPI app with custom docs URLs
@@ -33,6 +36,7 @@ settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors.allow_origins,
+    allow_credentials=True,
     allow_methods=settings.cors.allow_methods,
     allow_headers=settings.cors.allow_headers,
 )
@@ -52,21 +56,30 @@ REQUEST_COUNT = Counter(
     "http_requests_total", "Total HTTP Requests", ["method", "endpoint", "status"]
 )
 
+# Setup Prometheus metrics if enabled
+if settings.metrics_enabled:
+    metrics_app = make_asgi_app()
+    app.mount("/metrics", metrics_app)
+
 # Include routers
 app.include_router(scan.router)
 app.include_router(jobs.router)
 
 
-@app.get("/healthz")
-async def health():
-    """Health check endpoint."""
-    return {"status": "ok"}
+@app.get("/health")
+async def health_check():
+    """Check the health status of the application."""
+    return {"status": "healthy"}
 
 
-@app.get("/metrics")
-async def metrics():
-    """Prometheus metrics endpoint."""
-    return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+@app.get("/")
+async def root():
+    """Return basic API information."""
+    return {
+        "name": "ZebraFetch API",
+        "version": "1.0.0",
+        "description": "PDF processing and barcode scanning service"
+    }
 
 
 @app.on_event("startup")
@@ -87,3 +100,13 @@ async def periodic_cleanup():
     while True:
         await cleanup_expired_jobs()
         await asyncio.sleep(3600)  # Run every hour
+
+
+@app.exception_handler(ZebraFetchException)
+async def zebrafetch_exception_handler(request, exc):
+    """Handle ZebraFetch exceptions and return appropriate HTTP responses."""
+    return HTTPException(
+        status_code=exc.status_code,
+        detail=exc.detail,
+        headers=exc.headers
+    )

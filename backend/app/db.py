@@ -1,3 +1,5 @@
+"""Database operations for job management and persistence."""
+
 import sqlite3
 import json
 from datetime import datetime, timedelta
@@ -7,7 +9,7 @@ import asyncio
 from functools import partial
 import os
 
-from .config import Settings, get_settings
+from .config import get_settings
 
 
 @contextmanager
@@ -30,7 +32,7 @@ async def init_db():
 
 
 def _init_db_sync():
-    """Synchronous database initialization."""
+    """Initialize the database schema synchronously."""
     with get_db_connection() as conn:
         with open("schemas/jobs.sql", "r") as f:
             conn.executescript(f.read())
@@ -38,7 +40,7 @@ def _init_db_sync():
 
 
 async def create_job(job_id: str, input_path: str) -> None:
-    """Create a new job record."""
+    """Create a new job record in the database."""
     settings = get_settings()
     expires_at = datetime.utcnow() + timedelta(hours=settings.job_retention_hours)
 
@@ -49,7 +51,7 @@ async def create_job(job_id: str, input_path: str) -> None:
 
 
 def _create_job_sync(job_id: str, input_path: str, expires_at: datetime) -> None:
-    """Synchronous job creation."""
+    """Create a new job record synchronously."""
     with get_db_connection() as conn:
         conn.execute(
             """
@@ -67,7 +69,7 @@ async def update_job_status(
     result: Optional[Dict[str, Any]] = None,
     artifact_paths: Optional[list] = None,
 ) -> None:
-    """Update job status and optionally set result."""
+    """Update job status and optionally set result and artifact paths."""
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
         None, partial(_update_job_sync, job_id, status, result, artifact_paths)
@@ -80,7 +82,7 @@ def _update_job_sync(
     result: Optional[Dict[str, Any]] = None,
     artifact_paths: Optional[list] = None,
 ) -> None:
-    """Synchronous job update."""
+    """Update job status synchronously with optional result and artifacts."""
     with get_db_connection() as conn:
         updates = ["status = ?", "updated_at = CURRENT_TIMESTAMP"]
         params = [status]
@@ -93,11 +95,11 @@ def _update_job_sync(
             updates.append("artifact_paths = ?")
             params.append(json.dumps(artifact_paths))
 
-        query = f"""
-            UPDATE jobs
-            SET {', '.join(updates)}
-            WHERE id = ?
-        """
+        query = (
+            "UPDATE jobs "
+            f"SET {', '.join(updates)} "
+            "WHERE id = ?"
+        )
         params.append(job_id)
 
         conn.execute(query, params)
@@ -105,13 +107,13 @@ def _update_job_sync(
 
 
 async def get_job(job_id: str) -> Optional[Dict[str, Any]]:
-    """Get job details by ID."""
+    """Retrieve job details by ID."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, partial(_get_job_sync, job_id))
 
 
 def _get_job_sync(job_id: str) -> Optional[Dict[str, Any]]:
-    """Synchronous job retrieval."""
+    """Retrieve job details synchronously by ID."""
     with get_db_connection() as conn:
         cursor = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
         row = cursor.fetchone()
@@ -127,13 +129,13 @@ def _get_job_sync(job_id: str) -> Optional[Dict[str, Any]]:
 
 
 async def cleanup_expired_jobs() -> None:
-    """Remove expired jobs and their artifacts."""
+    """Remove expired jobs and their associated artifacts."""
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _cleanup_expired_jobs_sync)
 
 
 def _cleanup_expired_jobs_sync() -> None:
-    """Synchronous cleanup of expired jobs."""
+    """Remove expired jobs and their artifacts synchronously."""
     with get_db_connection() as conn:
         # Get expired jobs with artifacts
         cursor = conn.execute(
@@ -146,10 +148,12 @@ def _cleanup_expired_jobs_sync() -> None:
         expired_jobs = cursor.fetchall()
 
         # Delete expired jobs
-        conn.execute("DELETE FROM jobs WHERE expires_at < CURRENT_TIMESTAMP")
+        conn.execute(
+            "DELETE FROM jobs WHERE expires_at < CURRENT_TIMESTAMP"
+        )
         conn.commit()
 
-        # Clean up artifacts (implementation depends on storage strategy)
+        # Clean up artifacts
         for job in expired_jobs:
             if job["artifact_paths"]:
                 artifact_paths = json.loads(job["artifact_paths"])
