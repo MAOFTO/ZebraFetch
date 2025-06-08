@@ -95,11 +95,7 @@ def _update_job_sync(
             updates.append("artifact_paths = ?")
             params.append(json.dumps(artifact_paths))
 
-        query = (
-            "UPDATE jobs "
-            f"SET {', '.join(updates)} "
-            "WHERE id = ?"
-        )
+        query = "UPDATE jobs " f"SET {', '.join(updates)} " "WHERE id = ?"
         params.append(job_id)
 
         conn.execute(query, params)

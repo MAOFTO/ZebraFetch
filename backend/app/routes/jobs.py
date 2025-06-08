@@ -42,8 +42,7 @@ async def create_scan_job(
     # Validate file type
     if not file.content_type == "application/pdf":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be a PDF"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="File must be a PDF"
         )
 
     # Read file content
@@ -105,18 +104,12 @@ async def create_scan_job(
 
                 # Update job with results
                 await update_job_status(
-                    job_id,
-                    "completed",
-                    result={"results": results}
+                    job_id, "completed", result={"results": results}
                 )
 
             except Exception as e:
                 # Update job with error
-                await update_job_status(
-                    job_id,
-                    "failed",
-                    result={"error": str(e)}
-                )
+                await update_job_status(job_id, "failed", result={"error": str(e)})
 
             finally:
                 # Clean up temporary file
@@ -129,23 +122,20 @@ async def create_scan_job(
     task_group.create_task(process_job())
 
     return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content={"job_id": job_id}
+        status_code=status.HTTP_202_ACCEPTED, content={"job_id": job_id}
     )
 
 
 @router.get("/jobs/{job_id}")
 async def get_job_status(
-    job_id: str,
-    api_key: str = Depends(get_api_key)
+    job_id: str, api_key: str = Depends(get_api_key)
 ) -> JSONResponse:
     """Get the status and results of a scan job."""
     job = await get_job(job_id)
 
     if not job:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
         )
 
     return JSONResponse(content=job)
