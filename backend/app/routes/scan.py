@@ -12,7 +12,7 @@ from app.dependencies.auth import get_api_key
 router = APIRouter(prefix="/v1")
 
 
-@router.post("/scan")  # type: ignore[misc]
+@router.post("/scan")  # type: ignore
 async def scan_pdf(
     file: UploadFile = File(...),
     pages: Optional[str] = None,

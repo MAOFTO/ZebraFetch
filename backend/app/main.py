@@ -66,13 +66,13 @@ app.include_router(scan.router)
 app.include_router(jobs.router)
 
 
-@app.get("/health")  # type: ignore[misc]
+@app.get("/health")  # type: ignore
 async def health_check() -> Dict[str, str]:
     """Check the health status of the application."""
     return {"status": "healthy"}
 
 
-@app.get("/")  # type: ignore[misc]
+@app.get("/")  # type: ignore
 async def root() -> Dict[str, str]:
     """Return basic API information."""
     return {
@@ -82,7 +82,7 @@ async def root() -> Dict[str, str]:
     }
 
 
-@app.on_event("startup")  # type: ignore[misc]
+@app.on_event("startup")  # type: ignore
 async def startup_event() -> None:
     """Initialize application on startup."""
     # Initialize database
@@ -102,7 +102,7 @@ async def periodic_cleanup() -> None:
         await asyncio.sleep(3600)  # Run every hour
 
 
-@app.exception_handler(ZebraFetchException)  # type: ignore[misc]
+@app.exception_handler(ZebraFetchException)  # type: ignore
 async def zebrafetch_exception_handler(
     request: Request, exc: ZebraFetchException
 ) -> HTTPException:

@@ -30,7 +30,7 @@ def init_task_group() -> None:
         raise NotImplementedError("TaskGroup requires Python 3.11+")
 
 
-@router.post("/jobs")  # type: ignore[misc]
+@router.post("/jobs")  # type: ignore
 async def create_scan_job(
     file: UploadFile = File(...),
     pages: Optional[str] = None,
@@ -133,7 +133,7 @@ async def create_scan_job(
     )
 
 
-@router.get("/jobs/{job_id}")  # type: ignore[misc]
+@router.get("/jobs/{job_id}")  # type: ignore
 async def get_job_status(
     job_id: str, api_key: str = Depends(get_api_key)
 ) -> JSONResponse:
