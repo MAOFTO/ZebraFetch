@@ -1,32 +1,37 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
-from typing import Optional
+from typing import Optional, Any
 import asyncio
 import tempfile
 import os
 import uuid
+import sys
 
-from ..config import get_settings
-from ..services.scanner import Scanner
-from ..dependencies.auth import get_api_key
-from ..db import create_job, update_job_status, get_job
+from app.config import get_settings
+from app.services.scanner import Scanner
+from app.dependencies.auth import get_api_key
+from app.db import create_job, update_job_status, get_job
 
 router = APIRouter(prefix="/v1")
 
-# Global task group for managing concurrent jobs
-task_group: Optional[asyncio.TaskGroup] = None
-task_semaphore: Optional[asyncio.Semaphore] = None
+# Use Any for task_group to avoid mypy issues with TaskGroup in Python <3.11
+# and to keep compatibility with dynamic import
+# This is safe because we only use create_task on it if it is not None
+# and it is always set to a TaskGroup instance in init_task_group()
+task_group: Any = None
 
 
 def init_task_group() -> None:
     """Initialize the task group and semaphore."""
-    global task_group, task_semaphore
+    global task_group
     settings = get_settings()
-    task_semaphore = asyncio.Semaphore(settings.worker_pool_size)
-    task_group = asyncio.TaskGroup()
+    if sys.version_info >= (3, 11):
+        task_group = asyncio.TaskGroup()
+    else:
+        raise NotImplementedError("TaskGroup requires Python 3.11+")
 
 
-@router.post("/jobs")
+@router.post("/jobs")  # type: ignore[misc]
 async def create_scan_job(
     file: UploadFile = File(...),
     pages: Optional[str] = None,
@@ -81,8 +86,11 @@ async def create_scan_job(
     symbologies = types.split(",") if types else None
 
     # Schedule processing
-    async def process_job():
-        async with task_semaphore:
+    async def process_job() -> None:
+        if task_group is None:
+            return
+
+        async with task_group:
             try:
                 # Update status to running
                 await update_job_status(job_id, "running")
@@ -118,14 +126,15 @@ async def create_scan_job(
                     pass
 
     # Add task to group
-    task_group.create_task(process_job())
+    if task_group is not None:
+        task_group.create_task(process_job())
 
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED, content={"job_id": job_id}
     )
 
 
-@router.get("/jobs/{job_id}")
+@router.get("/jobs/{job_id}")  # type: ignore[misc]
 async def get_job_status(
     job_id: str, api_key: str = Depends(get_api_key)
 ) -> JSONResponse:

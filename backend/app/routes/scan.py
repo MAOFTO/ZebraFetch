@@ -5,14 +5,14 @@ import asyncio
 import tempfile
 import os
 
-from ..config import get_settings
-from ..services.scanner import Scanner
-from ..dependencies.auth import get_api_key
+from app.config import get_settings
+from app.services.scanner import Scanner
+from app.dependencies.auth import get_api_key
 
 router = APIRouter(prefix="/v1")
 
 
-@router.post("/scan")
+@router.post("/scan")  # type: ignore[misc]
 async def scan_pdf(
     file: UploadFile = File(...),
     pages: Optional[str] = None,

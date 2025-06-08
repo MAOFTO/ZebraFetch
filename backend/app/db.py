@@ -3,17 +3,17 @@
 import sqlite3
 import json
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Iterator
 from contextlib import contextmanager
 import asyncio
 from functools import partial
 import os
 
-from .config import get_settings
+from app.config import get_settings
 
 
 @contextmanager
-def get_db_connection():
+def get_db_connection() -> Iterator[sqlite3.Connection]:
     """Get a SQLite database connection."""
     settings = get_settings()
     db_path = settings.sqlite_url.replace("sqlite:///", "")
@@ -25,13 +25,13 @@ def get_db_connection():
         conn.close()
 
 
-async def init_db():
+async def init_db() -> None:
     """Initialize the database schema."""
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _init_db_sync)
 
 
-def _init_db_sync():
+def _init_db_sync() -> None:
     """Initialize the database schema synchronously."""
     with get_db_connection() as conn:
         with open("schemas/jobs.sql", "r") as f:

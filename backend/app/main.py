@@ -1,16 +1,17 @@
 """Main FastAPI application module for ZebraFetch."""
 
-from fastapi import FastAPI, status, HTTPException
+from fastapi import FastAPI, status, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, make_asgi_app
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import asyncio
+from typing import Dict
 
-from .config import get_settings
-from .db import init_db, cleanup_expired_jobs
-from .routes import scan, jobs
-from .exceptions import (
+from app.config import get_settings
+from app.db import init_db, cleanup_expired_jobs
+from app.routes import scan, jobs
+from app.exceptions import (
     validation_exception_handler,
     http_exception_handler,
     payload_too_large_handler,
@@ -65,14 +66,14 @@ app.include_router(scan.router)
 app.include_router(jobs.router)
 
 
-@app.get("/health")
-async def health_check():
+@app.get("/health")  # type: ignore[misc]
+async def health_check() -> Dict[str, str]:
     """Check the health status of the application."""
     return {"status": "healthy"}
 
 
-@app.get("/")
-async def root():
+@app.get("/")  # type: ignore[misc]
+async def root() -> Dict[str, str]:
     """Return basic API information."""
     return {
         "name": "ZebraFetch API",
@@ -81,8 +82,8 @@ async def root():
     }
 
 
-@app.on_event("startup")
-async def startup_event():
+@app.on_event("startup")  # type: ignore[misc]
+async def startup_event() -> None:
     """Initialize application on startup."""
     # Initialize database
     await init_db()
@@ -94,15 +95,17 @@ async def startup_event():
     asyncio.create_task(periodic_cleanup())
 
 
-async def periodic_cleanup():
+async def periodic_cleanup() -> None:
     """Periodically clean up expired jobs."""
     while True:
         await cleanup_expired_jobs()
         await asyncio.sleep(3600)  # Run every hour
 
 
-@app.exception_handler(ZebraFetchException)
-async def zebrafetch_exception_handler(request, exc):
+@app.exception_handler(ZebraFetchException)  # type: ignore[misc]
+async def zebrafetch_exception_handler(
+    request: Request, exc: ZebraFetchException
+) -> HTTPException:
     """Handle ZebraFetch exceptions and return appropriate HTTP responses."""
     return HTTPException(
         status_code=exc.status_code, detail=exc.detail, headers=exc.headers
