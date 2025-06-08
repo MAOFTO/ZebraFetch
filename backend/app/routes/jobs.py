@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
-from typing import Optional, Any
+from typing import Optional, Coroutine, Any
 import asyncio
 import tempfile
 import os
@@ -14,20 +14,30 @@ from app.db import create_job, update_job_status, get_job
 
 router = APIRouter(prefix="/v1")
 
-# Use Any for task_group to avoid mypy issues with TaskGroup in Python <3.11
-# and to keep compatibility with dynamic import
-# This is safe because we only use create_task on it if it is not None
-# and it is always set to a TaskGroup instance in init_task_group()
-task_group: Any = None
+
+# Global task group manager
+class TaskGroupManager:
+    def __init__(self) -> None:
+        self._task_group: Optional[asyncio.TaskGroup] = None
+        self._lock = asyncio.Lock()
+
+    async def get_task_group(self) -> asyncio.TaskGroup:
+        async with self._lock:
+            if self._task_group is None:
+                if sys.version_info >= (3, 11):
+                    self._task_group = asyncio.TaskGroup()
+                else:
+                    raise NotImplementedError("TaskGroup requires Python 3.11+")
+            return self._task_group
+
+    async def create_task(self, coro: Coroutine[Any, Any, None]) -> None:
+        task_group = await self.get_task_group()
+        async with task_group:
+            task_group.create_task(coro)
 
 
-def init_task_group() -> None:
-    """Initialize the task group and semaphore."""
-    global task_group
-    if sys.version_info >= (3, 11):
-        task_group = asyncio.TaskGroup()
-    else:
-        raise NotImplementedError("TaskGroup requires Python 3.11+")
+# Initialize task group manager
+task_manager = TaskGroupManager()
 
 
 @router.post("/jobs")  # type: ignore
@@ -86,47 +96,40 @@ async def create_scan_job(
 
     # Schedule processing
     async def process_job() -> None:
-        if task_group is None:
-            return
+        try:
+            # Update status to running
+            await update_job_status(job_id, "running")
 
-        async with task_group:
+            # Process PDF
+            scanner = Scanner()
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: scanner.scan_pdf(
+                    content,
+                    page_range=page_range,
+                    symbologies=symbologies,
+                    embed_page=embed_page,
+                    embed_snippet=embed_snippet,
+                ),
+            )
+
+            # Update job with results
+            await update_job_status(job_id, "completed", result={"results": results})
+
+        except Exception as e:
+            # Update job with error
+            await update_job_status(job_id, "failed", result={"error": str(e)})
+
+        finally:
+            # Clean up temporary file
             try:
-                # Update status to running
-                await update_job_status(job_id, "running")
-
-                # Process PDF
-                scanner = Scanner()
-                loop = asyncio.get_event_loop()
-                results = await loop.run_in_executor(
-                    None,
-                    lambda: scanner.scan_pdf(
-                        content,
-                        page_range=page_range,
-                        symbologies=symbologies,
-                        embed_page=embed_page,
-                        embed_snippet=embed_snippet,
-                    ),
-                )
-
-                # Update job with results
-                await update_job_status(
-                    job_id, "completed", result={"results": results}
-                )
-
-            except Exception as e:
-                # Update job with error
-                await update_job_status(job_id, "failed", result={"error": str(e)})
-
-            finally:
-                # Clean up temporary file
-                try:
-                    os.unlink(temp_path)
-                except OSError:
-                    pass
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
     # Add task to group
-    if task_group is not None:
-        task_group.create_task(process_job())
+    await task_manager.create_task(process_job())
 
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED, content={"job_id": job_id}
