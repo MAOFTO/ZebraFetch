@@ -1,14 +1,8 @@
 """Main FastAPI application module for ZebraFetch."""
 
-from fastapi import FastAPI, Request, status, HTTPException
+from fastapi import FastAPI, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import (
-    Counter,
-    generate_latest,
-    CONTENT_TYPE_LATEST,
-    make_asgi_app,
-)
-from fastapi.responses import PlainTextResponse, JSONResponse
+from prometheus_client import Counter, make_asgi_app
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import asyncio
@@ -28,7 +22,7 @@ from .exceptions import (
 app = FastAPI(
     title="ZebraFetch API",
     version="1.0.0",
-    description="Dockerized REST API for barcode extraction from PDF documents.",
+    description=("Dockerized REST API for barcode extraction " "from PDF documents."),
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",

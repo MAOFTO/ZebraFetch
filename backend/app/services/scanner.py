@@ -73,11 +73,13 @@ class Scanner:
                     logger.debug(f"Checking if {barcode_format} is in {symbologies}")
                     if barcode_format not in symbologies:
                         logger.debug(
-                            f"Skipping barcode - format {barcode_format} not in requested symbologies"
+                            f"Skipping barcode - format {barcode_format} "
+                            "not in requested symbologies"
                         )
                         continue
                     logger.debug(
-                        f"Keeping barcode - format {barcode_format} matches requested symbologies"
+                        f"Keeping barcode - format {barcode_format} "
+                        "matches requested symbologies"
                     )
 
                 # Embed page image if requested
