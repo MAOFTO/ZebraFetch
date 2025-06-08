@@ -22,7 +22,10 @@ from .exceptions import (
 app = FastAPI(
     title="ZebraFetch API",
     version="1.0.0",
-    description=("Dockerized REST API for barcode extraction " "from PDF documents."),
+    description=(
+        "Dockerized REST API for barcode extraction "
+        "from PDF documents."
+    ),
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -41,18 +44,28 @@ app.add_middleware(
 )
 
 # Add exception handlers
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(
-    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, payload_too_large_handler
+    RequestValidationError,
+    validation_exception_handler
 )
 app.add_exception_handler(
-    status.HTTP_429_TOO_MANY_REQUESTS, rate_limit_exceeded_handler
+    StarletteHTTPException,
+    http_exception_handler
+)
+app.add_exception_handler(
+    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+    payload_too_large_handler
+)
+app.add_exception_handler(
+    status.HTTP_429_TOO_MANY_REQUESTS,
+    rate_limit_exceeded_handler
 )
 
 # Metrics
 REQUEST_COUNT = Counter(
-    "http_requests_total", "Total HTTP Requests", ["method", "endpoint", "status"]
+    "http_requests_total",
+    "Total HTTP Requests",
+    ["method", "endpoint", "status"]
 )
 
 # Setup Prometheus metrics if enabled
@@ -105,5 +118,7 @@ async def periodic_cleanup():
 async def zebrafetch_exception_handler(request, exc):
     """Handle ZebraFetch exceptions and return appropriate HTTP responses."""
     return HTTPException(
-        status_code=exc.status_code, detail=exc.detail, headers=exc.headers
+        status_code=exc.status_code,
+        detail=exc.detail,
+        headers=exc.headers
     )
