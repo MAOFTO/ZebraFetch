@@ -74,8 +74,8 @@ jobs:
         context: ./backend
         push: true
         tags: |
-          zebrafetch/zebrafetch:latest
-          zebrafetch/zebrafetch:${{ github.ref == 'refs/heads/main' && 'dev' || github.ref_name }}
+          martinlehnert/zebrafetch:latest
+          martinlehnert/zebrafetch:${{ github.ref == 'refs/heads/main' && 'dev' || github.ref_name }}
 
   perf-test:
     needs: test
