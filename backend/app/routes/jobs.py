@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
-from typing import Optional
+from typing import Optional, Any
 import asyncio
 import tempfile
 import os
@@ -14,11 +14,11 @@ from ..db import create_job, update_job_status, get_job
 router = APIRouter(prefix="/v1")
 
 # Global task group for managing concurrent jobs
-task_group = None
-task_semaphore = None
+task_group: Optional[asyncio.TaskGroup] = None
+task_semaphore: Optional[asyncio.Semaphore] = None
 
 
-def init_task_group():
+def init_task_group() -> None:
     """Initialize the task group and semaphore."""
     global task_group, task_semaphore
     settings = get_settings()
