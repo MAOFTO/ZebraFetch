@@ -1,3 +1,5 @@
+"""Authentication dependencies for the ZebraFetch API."""
+
 from fastapi import HTTPException, Security, status
 from fastapi.security.api_key import APIKeyHeader
 from app.config import get_settings
@@ -6,6 +8,7 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def get_api_key(api_key: str = Security(api_key_header)) -> str:
+    """Get the API key for authentication."""
     settings = get_settings()
     if not settings.auth_enabled:
         return ""
@@ -15,3 +18,8 @@ async def get_api_key(api_key: str = Security(api_key_header)) -> str:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or missing API key",
     )
+
+
+def get_current_user() -> None:
+    """Get the current authenticated user."""
+    # ... existing code ...

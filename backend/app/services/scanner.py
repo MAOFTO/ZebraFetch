@@ -9,6 +9,8 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+"""Scanner service for the ZebraFetch API."""
+
 
 class Scanner:
     """Service for scanning PDFs and extracting barcodes."""

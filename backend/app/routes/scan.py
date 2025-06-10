@@ -1,3 +1,5 @@
+"""Scan routes for the ZebraFetch API."""
+
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
 from typing import Optional
