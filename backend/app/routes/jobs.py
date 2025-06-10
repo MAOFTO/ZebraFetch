@@ -19,11 +19,15 @@ router = APIRouter(prefix="/v1")
 
 # Global task group manager
 class TaskGroupManager:
+    """Manages a global asyncio.TaskGroup for job processing."""
+
     def __init__(self) -> None:
+        """Initialize the TaskGroupManager."""
         self._task_group: Optional[Any] = None
         self._lock = asyncio.Lock()
 
     async def get_task_group(self) -> Any:
+        """Get or create the global TaskGroup instance."""
         async with self._lock:
             if self._task_group is None:
                 if sys.version_info >= (3, 11):
@@ -33,6 +37,7 @@ class TaskGroupManager:
             return self._task_group
 
     async def create_task(self, coro: Coroutine[Any, Any, None]) -> None:
+        """Add a coroutine to the global TaskGroup."""
         task_group = await self.get_task_group()
         async with task_group:
             task_group.create_task(coro)

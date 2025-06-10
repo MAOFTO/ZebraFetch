@@ -1,3 +1,5 @@
+"""Scanner service for the ZebraFetch API."""
+
 import io
 import base64
 from typing import List, Dict, Any, Optional
