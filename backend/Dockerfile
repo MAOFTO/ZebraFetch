@@ -32,16 +32,17 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 
 # Copy application code and resources
-COPY app ./app
-COPY schemas ./schemas
-COPY config.yaml ./config.yaml
+COPY backend/app ./app
+COPY backend/schemas ./schemas
+COPY backend/config.yaml ./config.yaml
+
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV ZF_CONFIG=/app/config.yaml
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Expose port
