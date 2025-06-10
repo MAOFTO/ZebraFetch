@@ -41,7 +41,7 @@ ENV PYTHONPATH=/app
 ENV ZF_CONFIG=/app/config.yaml
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY ../requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Expose port
